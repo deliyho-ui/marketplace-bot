@@ -29,7 +29,6 @@ def load_fb_session() -> dict | None:
     1. מ-environment variable FB_SESSION (base64) – לשרת ב-Railway
     2. מקובץ data/fb_session.json – לבדיקה מקומית
     """
-    # ── מ-env var (Railway) ──
     b64 = os.environ.get("FB_SESSION", "")
     if b64:
         try:
@@ -38,13 +37,11 @@ def load_fb_session() -> dict | None:
         except Exception as e:
             print(f"❌ שגיאה בטעינת FB_SESSION: {e}")
 
-    # ── מקובץ מקומי ──
     if os.path.exists(SESSION_FILE):
         with open(SESSION_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
 
     print("❌ לא נמצא סשן פייסבוק!")
-    print("   הרץ: python generate_session.py")
     return None
 
 
@@ -55,23 +52,25 @@ def load_fb_session() -> dict | None:
 def scan_marketplace(page, query: str, max_price: str = "", location: str = "", radius: str = "") -> list:
     """מחזיר רשימה של פריטים (id, url, text)."""
     
+    # בניית ה-URL לפי מיקום ורדיוס
     if location:
         base_url = f"https://www.facebook.com/marketplace/{location}/search/"
     else:
         base_url = "https://www.facebook.com/marketplace/search/"
         
     url = f"{base_url}?query={quote(query)}&sortBy=creation_time_descend"
+    
     if max_price:
         url += f"&maxPrice={max_price}"
     if radius:
         url += f"&radius={radius}"
 
-    print(f"  🔍 \"{query}\" (Location: {location or 'Default'}, Radius: {radius or 'Default'})")
+    print(f"  🔍 סורק: \"{query}\" | אזור: {location or 'Default'} | רדיוס: {radius or 'Default'} ק\"מ")
 
     try:
         page.goto(url, wait_until="domcontentloaded", timeout=30_000)
-        page.wait_for_timeout(5_000)   # המתנה לטעינת AJAX
-# ... (שאר הפונקציה נשאר בדיוק אותו דבר מפה והלאה)
+        page.wait_for_timeout(5_000)   # המתנה לטעינת התוצאות
+
         items = page.evaluate("""
             () => {
                 const results = [];
@@ -101,11 +100,11 @@ def scan_marketplace(page, query: str, max_price: str = "", location: str = "", 
         """)
 
         items = items or []
-        print(f"  📦 {len(items)} פריטים")
+        print(f"  📦 נמצאו {len(items)} פריטים")
         return items
 
     except Exception as e:
-        print(f"  ❌ שגיאה: {e}")
+        print(f"  ❌ שגיאה בסריקה: {e}")
         return []
 
 
@@ -139,8 +138,8 @@ def format_alert(item: dict, query: str) -> str:
 # ──────────────────────────────────────────
 
 def run_scanner():
-    """מריץ סריקה כל 10 דקות – ברקע, בthread נפרד."""
-    print("\n🤖 סורק מופעל")
+    """מריץ סריקה כל 10 דקות ברקע."""
+    print("\n🤖 סורק הופעל")
 
     session = load_fb_session()
     if not session:
@@ -155,18 +154,6 @@ def run_scanner():
         context = browser.new_context(storage_state=session)
         page    = context.new_page()
 
-        # בדיקת חיבור ראשונית
-        try:
-            page.goto("https://www.facebook.com/marketplace",
-                      wait_until="domcontentloaded", timeout=20_000)
-            page.wait_for_timeout(2_000)
-            if "login" in page.url.lower():
-                print("⚠️  הסשן פג – יש ליצור סשן חדש (generate_session.py)")
-                browser.close()
-                return
-        except Exception:
-            pass
-
         while True:
             scan_num += 1
             ts = datetime.now().strftime("%H:%M:%S")
@@ -178,37 +165,28 @@ def run_scanner():
 
             new_total = 0
 
-           for phone, searches in all_searches.items():
+            for phone, searches in all_searches.items():
                 for s in searches:
                     query     = s["query"]
                     max_price = s.get("max_price", "")
                     location  = s.get("location", "")
                     radius    = s.get("radius", "")
-                    items     = scan_marketplace (page, query, max_price, location, radius)
+                    
+                    items = scan_marketplace(page, query, max_price, location, radius)
+
                     for item in items:
                         key = f"{phone}::{query}::{item['id']}"
                         if key not in seen:
                             seen.add(key)
-                            if scan_num > 1:   # סריקה ראשונה = אתחול בלבד
+                            if scan_num > 1:
                                 new_total += 1
-                                print(f"  🆕 שולח התראה → {phone}")
+                                print(f"  🆕 שולח התראה ל-{phone}")
                                 send_message(phone, format_alert(item, query))
                                 time.sleep(2)
 
-                    time.sleep(3)   # הפסקה קצרה בין חיפושים
+                    time.sleep(3)
 
             save_seen(seen)
-
-            if scan_num == 1:
-                total_items = sum(
-                    len(items)
-                    for searches in all_searches.values()
-                    for s in searches
-                    for items in [scan_marketplace.__wrapped__ if hasattr(scan_marketplace, '__wrapped__') else []]
-                )
-                print("✅ אתחול הושלם – פריטים קיימים סומנו (לא נשלחו התראות)")
-            else:
-                print(f"✅ {new_total} פריטים חדשים נשלחו")
-
-            print(f"💤 ממתין 10 דקות…")
+            print(f"✅ סריקה #{scan_num} הושלמה. נמצאו {new_total} פריטים חדשים.")
+            print(f"💤 ממתין {SCAN_INTERVAL // 60} דקות…")
             time.sleep(SCAN_INTERVAL)
