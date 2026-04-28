@@ -45,13 +45,12 @@ def get_all_searches() -> dict:
     return _load_searches()
 
 
-def add_search(phone: str, query: str, max_price: str = "") -> bool:
+def add_search(phone: str, query: str, max_price: str = "", location: str = "", radius: str = "") -> bool:
     """מוסיף חיפוש. מחזיר False אם כבר קיים."""
     data = _load_searches()
     if phone not in data:
         data[phone] = []
 
-    # בדיקת כפילות
     for s in data[phone]:
         if s["query"].strip().lower() == query.strip().lower():
             return False
@@ -59,6 +58,8 @@ def add_search(phone: str, query: str, max_price: str = "") -> bool:
     data[phone].append({
         "query":      query,
         "max_price":  max_price,
+        "location":   location,
+        "radius":     radius,
         "created_at": datetime.now().isoformat()
     })
     _save_searches(data)
