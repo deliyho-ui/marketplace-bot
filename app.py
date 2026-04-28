@@ -95,29 +95,28 @@ def handle_message(phone: str, text: str):
             send_message(phone, "\n".join(lines))
         return
 
-    # ── הוספת חיפוש ──
+   # ── הוספת חיפוש ──
     if tl.startswith("חפש ") or tl.startswith("/חפש "):
-        _, _, rest = t.partition(" ")
-        rest = rest.strip()
+        rest = t[4:].strip()
         if not rest:
-            send_message(phone, "כתוב מה לחפש.\nלדוגמה: *חפש אייפון 13*")
+            send_message(phone, "כתוב מה לחפש.\nלדוגמה: *חפש mazda mx-5 bronze, miami, 15000, 50*")
             return
 
-        # זיהוי מחיר מקסימום – "חפש אייפון 13 עד 2000"
-        max_price = ""
-        query     = rest
-        if " עד " in rest.lower():
-            parts     = rest.lower().split(" עד ")
-            query     = rest[:rest.lower().index(" עד ")].strip()
-            price_str = parts[-1].strip().replace("₪", "").replace(",", "").strip()
-            if price_str.isdigit():
-                max_price = price_str
+        parts = [p.strip() for p in rest.split(",")]
+        query = parts[0]
+        location = parts[1].replace(" ", "").lower() if len(parts) > 1 else ""
+        max_price = parts[2].replace("₪", "").replace("$", "").strip() if len(parts) > 2 else ""
+        radius = parts[3].replace("km", "").replace("קמ", "").strip() if len(parts) > 3 else ""
 
-        added = add_search(phone, query, max_price)
+        added = add_search(phone, query, max_price, location, radius)
         if added:
             msg = f"✅ הוספתי חיפוש: *{query}*"
+            if location:
+                msg += f"\n📍 אזור: {location}"
             if max_price:
-                msg += f" (עד {max_price} ₪)"
+                msg += f"\n💰 עד מחיר: {max_price}"
+            if radius:
+                msg += f" (רדיוס: {radius} ק״מ)"
             msg += "\n\nאעדכן אותך ברגע שימצא משהו חדש! 🔍"
         else:
             msg = f"החיפוש *{query}* כבר קיים ברשימה שלך."
