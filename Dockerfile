@@ -25,6 +25,6 @@ COPY . .
 # יצירת תיקיית נתונים
 RUN mkdir -p data
 
-EXPOSE 8000
-
-CMD ["python", "app.py"]
+EXPOSE 8080
+ENV PYTHONUNBUFFERED=1
+CMD ["python", "-u", "app.py"]
