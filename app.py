@@ -41,8 +41,10 @@ def verify():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json(silent=True) or {}
-    print("=== הודעה נכנסת מ-META ===")
-    print(data)
+    
+    # שימוש בלוגר הרשמי של האפליקציה במקום print רגיל
+    app.logger.warning("=== הודעה נכנסת מ-META ===")
+    app.logger.warning(data)
 
     try:
         value   = data["entry"][0]["changes"][0]["value"]
@@ -58,12 +60,11 @@ def webhook():
             handle_message(phone, text)
 
     except (KeyError, IndexError) as e:
-        print(f"⚠️ ההודעה נדחתה בגלל שגיאת מבנה: {e}")
+        app.logger.warning(f"⚠️ ההודעה נדחתה בגלל שגיאת מבנה: {e}")
     except Exception as e:
-        print(f"❌ שגיאה ב-webhook: {e}")
+        app.logger.error(f"❌ שגיאה ב-webhook: {e}")
 
     return jsonify({"status": "ok"})
-
 
 # ──────────────────────────────────────────
 #  טיפול בהודעות נכנסות
