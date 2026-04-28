@@ -52,21 +52,26 @@ def load_fb_session() -> dict | None:
 #  סריקת Marketplace
 # ──────────────────────────────────────────
 
-def scan_marketplace(page, query: str, max_price: str = "") -> list:
+def scan_marketplace(page, query: str, max_price: str = "", location: str = "", radius: str = "") -> list:
     """מחזיר רשימה של פריטים (id, url, text)."""
-    url = (
-        f"https://www.facebook.com/marketplace/search/"
-        f"?query={quote(query)}&sortBy=creation_time_descend"
-    )
+    
+    if location:
+        base_url = f"https://www.facebook.com/marketplace/{location}/search/"
+    else:
+        base_url = "https://www.facebook.com/marketplace/search/"
+        
+    url = f"{base_url}?query={quote(query)}&sortBy=creation_time_descend"
     if max_price:
         url += f"&maxPrice={max_price}"
+    if radius:
+        url += f"&radius={radius}"
 
-    print(f"  🔍 \"{query}\"")
+    print(f"  🔍 \"{query}\" (Location: {location or 'Default'}, Radius: {radius or 'Default'})")
 
     try:
         page.goto(url, wait_until="domcontentloaded", timeout=30_000)
         page.wait_for_timeout(5_000)   # המתנה לטעינת AJAX
-
+# ... (שאר הפונקציה נשאר בדיוק אותו דבר מפה והלאה)
         items = page.evaluate("""
             () => {
                 const results = [];
@@ -173,12 +178,13 @@ def run_scanner():
 
             new_total = 0
 
-            for phone, searches in all_searches.items():
+           for phone, searches in all_searches.items():
                 for s in searches:
                     query     = s["query"]
                     max_price = s.get("max_price", "")
-                    items     = scan_marketplace(page, query, max_price)
-
+                    location  = s.get("location", "")
+                    radius    = s.get("radius", "")
+                    items     = scan_marketplace (page, query, max_price, location, radius)
                     for item in items:
                         key = f"{phone}::{query}::{item['id']}"
                         if key not in seen:
