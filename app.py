@@ -41,6 +41,8 @@ def verify():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json(silent=True) or {}
+    print("=== הודעה נכנסת מ-META ===")
+    print(data)
 
     try:
         value   = data["entry"][0]["changes"][0]["value"]
@@ -55,8 +57,8 @@ def webhook():
             text = msg["text"]["body"].strip()
             handle_message(phone, text)
 
-    except (KeyError, IndexError):
-        pass  # הודעות סטטוס / אחרות – מתעלמים
+    except (KeyError, IndexError) as e:
+        print(f"⚠️ ההודעה נדחתה בגלל שגיאת מבנה: {e}")
     except Exception as e:
         print(f"❌ שגיאה ב-webhook: {e}")
 
